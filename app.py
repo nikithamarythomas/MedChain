@@ -2,32 +2,32 @@ import streamlit as st
 import openai
 import numpy as np
 import faiss
-import os
+import requests
+from bs4 import BeautifulSoup
 
 # Retrieve OpenAI API key from secrets.toml
 openai.api_key = st.secrets["openai"]["api_key"]
 
-
-# Function to get embeddings from OpenAIstre
+# Function to get embeddings from OpenAI
 def get_embeddings(texts):
     response = openai.Embedding.create(
         input=texts,
-        model="text-embedding-ada-002"  # Ensure this model is available
+        model="text-embedding-ada-002"
     )
     embeddings = [item['embedding'] for item in response['data']]
     return np.array(embeddings)
 
-# Function to generate response from OpenAI (using chat model)
+# Function to generate a response from OpenAI (using chat model)
 def generate_response(messages):
     response = openai.ChatCompletion.create(
-        model="gpt-4",  # Use a chat model
+        model="gpt-4",
         messages=messages
     )
     return response.choices[0].message['content'].strip()
 
 # Initialize FAISS index
 def initialize_index(embeddings):
-    dimension = embeddings.shape[1]  # Dimension of embeddings
+    dimension = embeddings.shape[1]
     index = faiss.IndexFlatL2(dimension)
     index.add(embeddings)
     return index
@@ -35,10 +35,29 @@ def initialize_index(embeddings):
 # Function to retrieve relevant context from indexed documents
 def retrieve_context(query, index, documents):
     query_embedding = get_embeddings([query])
-    D, I = index.search(query_embedding, 1)  # Retrieve top 1 document
+    D, I = index.search(query_embedding, 1)
     top_doc_index = I[0][0]
     context = documents[top_doc_index]
     return context
+
+# Function to fetch research papers from PubMed
+def fetch_research_papers(query):
+    url = f"https://pubmed.ncbi.nlm.nih.gov/?term={query.replace(' ', '+')}"
+    response = requests.get(url)
+    soup = BeautifulSoup(response.text, 'html.parser')
+    papers = soup.find_all('a', class_='docsum-title')
+    return [paper.get_text() for paper in papers]
+
+# Function to summarize a document
+def summarize_document(document):
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=[
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": f"Please summarize the following document:\n{document}"}
+        ]
+    )
+    return response.choices[0].message['content'].strip()
 
 # Sample documents for indexing (replace with actual documents)
 documents = [
@@ -57,10 +76,22 @@ st.title('Health Q&A Application')
 user_query = st.text_input('Ask a question:')
 
 if user_query:
-    context = retrieve_context(user_query, index, documents)  # Retrieve relevant context
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": f"Context: {context}\nQuestion: {user_query}"}
-    ]
-    answer = generate_response(messages)  # Generate response
-    st.write(answer)
+    if st.checkbox('Retrieve research papers'):
+        research_papers = fetch_research_papers(user_query)
+        st.subheader('Research Papers')
+        for paper in research_papers:
+            st.write(paper)
+
+        if st.button('Summarize Research Papers'):
+            summaries = [summarize_document(paper) for paper in research_papers]
+            st.subheader('Summaries')
+            for summary in summaries:
+                st.write(summary)
+    else:
+        context = retrieve_context(user_query, index, documents)
+        messages = [
+            {"role": "system", "content": "You are a helpful assistant."},
+            {"role": "user", "content": f"Context: {context}\nQuestion: {user_query}"}
+        ]
+        answer = generate_response(messages)
+        st.write(answer)
