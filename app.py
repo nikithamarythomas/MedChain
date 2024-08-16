@@ -77,11 +77,10 @@ def initialize_conversation():
     assistant_message = "Hello! I am Streamly. How can I assist you with Streamlit today?"
 
     conversation_history = [
-        {"role": "system", "content": "You are Streamly, a specialized AI assistant trained in Streamlit."},
-        {"role": "system", "content": "Streamly, is powered by the OpenAI GPT-4o-mini model, released on July 18, 2024."},
-        {"role": "system", "content": "You are trained up to Streamlit Version 1.36.0, release on June 20, 2024."},
-        {"role": "system", "content": "Refer to conversation history to provide context to your response."},
-        {"role": "system", "content": "You were created by Madie Laine, an OpenAI Researcher."},
+        {"role": "system", "content": "You are a helpful health assistant, providing accurate and informative responses to user queries."},
+        {"role": "system", "content": "Avoid providing medical advice. Instead, suggest users consult a healthcare professional for diagnosis and treatment."},
+        {"role": "system", "content": "Use clear and easy-to-understand language, avoiding complex medical jargon."},
+        {"role": "system", "content": "Refer to conversation history to provide relevant and consistent information."},
         {"role": "assistant", "content": assistant_message}
     ]
     return conversation_history
@@ -207,7 +206,7 @@ def main():
 
     is_retrived = False        
     if last_user_query:
-        if st.checkbox('Retrieve research papers'):
+        if st.sidebar.button('Retrieve research papers'):
             is_retrived = True      
             titles, paper_links = fetch_research_papers(last_user_query)
             st.subheader('Research Papers')
@@ -215,13 +214,14 @@ def main():
                 st.write(title)
 
     if is_retrived:
+        print('+++++++++++++++++++++++++++++++++++++++++++',st.sidebar.button('Summarize Research Papers'))
         if st.sidebar.button('Summarize Research Papers'):
                 full_texts = [fetch_full_text(link) for link in paper_links]
                 st.subheader('Summarized Texts')
                 for text in full_texts:
                     st.write(summarize_document(text))
+        is_retrived = False
 
-    print('last_user_query---------------',paper_links)
 
 if __name__ == "__main__":
     main()
