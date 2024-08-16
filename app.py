@@ -63,6 +63,12 @@ def generate_response(question, context):
     result = llm(prompt)
     return result.strip()
 
+# Streamlit Page Configuration
+st.set_page_config(
+    page_title="MedChain",
+    page_icon="med.jpg",
+)
+
 # Streamlit Title
 st.title(":blue[Your Personal Healthcare Assistant]")
 
