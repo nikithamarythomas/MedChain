@@ -63,6 +63,9 @@ def generate_response(question, context):
     result = llm(prompt)
     return result.strip()
 
+# Streamlit Title
+st.title(":blue[Your Personal Healthcare Assistant]")
+
 def img_to_base64(img_path):
   with open(img_path, "rb") as image_file:
     return base64.b64encode(image_file.read()).decode('utf-8')
