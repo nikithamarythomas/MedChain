@@ -69,6 +69,10 @@ def summarize_document(document):
     return response.choices[0].message['content'].strip()
 
 # Streamlit interface
+st.set_page_config(
+    page_title="MedChain",
+     page_icon="🏥",
+)
 st.title('Health Q&A Application')
 
 user_query = st.text_input('Ask a question:')
