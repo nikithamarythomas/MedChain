@@ -99,8 +99,8 @@ def on_chat_submit(chat_input):
     """
     user_input = chat_input.strip().lower()
 
-    if 'conversation_history' not in st.session_state:
-        st.session_state.conversation_history = initialize_conversation()
+    # if 'conversation_history' not in st.session_state:
+    #     st.session_state.conversation_history = initialize_conversation()
 
     st.session_state.conversation_history.append({"role": "user", "content": user_input})
 
@@ -172,7 +172,6 @@ def main():
     titles = []      # Initialize titles to be used later
     paper_links = [] # Initialize paper_links to be used later
 
-    chat_history = []  # List to store conversation history
 
     if user_query:
         if full_texts:
@@ -214,7 +213,6 @@ def main():
                 st.write(title)
 
     if is_retrived:
-        print('+++++++++++++++++++++++++++++++++++++++++++',st.sidebar.button('Summarize Research Papers'))
         if st.sidebar.button('Summarize Research Papers'):
                 full_texts = [fetch_full_text(link) for link in paper_links]
                 st.subheader('Summarized Texts')
