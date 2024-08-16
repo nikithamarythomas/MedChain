@@ -83,8 +83,6 @@ def initialize_conversation():
     Returns:
     - list: Initialized conversation history.
     """
-    assistant_message = "Hello! I am Streamly. How can I assist you with Streamlit today?"
-
     conversation_history = [
         {"role": "system", "content": "You are a helpful health assistant, providing accurate and informative responses to user queries."}
     ]
