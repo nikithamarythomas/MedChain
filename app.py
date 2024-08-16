@@ -77,11 +77,11 @@ def initialize_conversation():
     assistant_message = "Hello! I am Streamly. How can I assist you with Streamlit today?"
 
     conversation_history = [
-        {"role": "system", "content": "You are a helpful health assistant, providing accurate and informative responses to user queries."},
-        {"role": "system", "content": "Avoid providing medical advice. Instead, suggest users consult a healthcare professional for diagnosis and treatment."},
-        {"role": "system", "content": "Use clear and easy-to-understand language, avoiding complex medical jargon."},
-        {"role": "system", "content": "Refer to conversation history to provide relevant and consistent information."},
-        {"role": "assistant", "content": assistant_message}
+        {"role": "system", "content": "You are a helpful health assistant, providing accurate and informative responses to user queries."}
+        # {"role": "system", "content": "Avoid providing medical advice. Instead, suggest users consult a healthcare professional for diagnosis and treatment."},
+        # {"role": "system", "content": "Use clear and easy-to-understand language, avoiding complex medical jargon."},
+        # {"role": "system", "content": "Refer to conversation history to provide relevant and consistent information."},
+        # {"role": "assistant", "content": assistant_message}
     ]
     return conversation_history
 
@@ -99,8 +99,8 @@ def on_chat_submit(chat_input):
     """
     user_input = chat_input.strip().lower()
 
-    # if 'conversation_history' not in st.session_state:
-    #     st.session_state.conversation_history = initialize_conversation()
+    if 'conversation_history' not in st.session_state:
+        st.session_state.conversation_history = initialize_conversation()
 
     st.session_state.conversation_history.append({"role": "user", "content": user_input})
 
