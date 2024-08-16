@@ -46,7 +46,16 @@ def fetch_research_papers(query):
     response = requests.get(url)
     soup = BeautifulSoup(response.text, 'html.parser')
     papers = soup.find_all('a', class_='docsum-title')
-    return [paper.get_text() for paper in papers]
+    titles = [paper.get_text() for paper in papers]
+    paper_links = [paper['href'] for paper in papers]
+    return titles, paper_links
+
+# Function to fetch full-text document from PubMed
+def fetch_full_text(url):
+    response = requests.get(f"https://pubmed.ncbi.nlm.nih.gov{url}")
+    soup = BeautifulSoup(response.text, 'html.parser')
+    abstract = soup.find('div', class_='abstract-content selected')
+    return abstract.get_text(strip=True) if abstract else 'No full text available.'
 
 # Function to summarize a document
 def summarize_document(document):
@@ -59,39 +68,44 @@ def summarize_document(document):
     )
     return response.choices[0].message['content'].strip()
 
-# Sample documents for indexing (replace with actual documents)
-documents = [
-    "Document 1: Health guidelines on cardiovascular diseases.",
-    "Document 2: Information about diabetes management.",
-    "Document 3: Latest research on mental health treatments."
-]
-
-# Encode documents and initialize FAISS index
-document_embeddings = get_embeddings(documents)
-index = initialize_index(document_embeddings)
-
 # Streamlit interface
 st.title('Health Q&A Application')
 
 user_query = st.text_input('Ask a question:')
+full_texts = []  # Initialize full_texts to be used later
+titles = []      # Initialize titles to be used later
+paper_links = [] # Initialize paper_links to be used later
 
 if user_query:
     if st.checkbox('Retrieve research papers'):
-        research_papers = fetch_research_papers(user_query)
+        titles, paper_links = fetch_research_papers(user_query)
         st.subheader('Research Papers')
-        for paper in research_papers:
-            st.write(paper)
+        for title in titles:
+            st.write(title)
 
         if st.button('Summarize Research Papers'):
-            summaries = [summarize_document(paper) for paper in research_papers]
-            st.subheader('Summaries')
-            for summary in summaries:
-                st.write(summary)
+            full_texts = [fetch_full_text(link) for link in paper_links]
+            st.subheader('Summarized Texts')
+            for text in full_texts:
+                st.write(text)
+
     else:
-        context = retrieve_context(user_query, index, documents)
-        messages = [
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": f"Context: {context}\nQuestion: {user_query}"}
-        ]
-        answer = generate_response(messages)
-        st.write(answer)
+        if full_texts:
+            # Encode documents and initialize FAISS index with real documents
+            document_embeddings = get_embeddings(full_texts)
+            index = initialize_index(document_embeddings)
+            context = retrieve_context(user_query, index, full_texts)
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": f"Context: {context}\nQuestion: {user_query}"}
+            ]
+            answer = generate_response(messages)
+            st.write(answer)
+        else:
+            # Handle scenario where there are no documents and no papers have been retrieved
+            messages = [
+                {"role": "system", "content": "You are a helpful assistant."},
+                {"role": "user", "content": f"Question: {user_query}"}
+            ]
+            answer = generate_response(messages)
+            st.write(answer)
