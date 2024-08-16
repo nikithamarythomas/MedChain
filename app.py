@@ -205,20 +205,21 @@ def main():
 
     is_retrived = False        
     if last_user_query:
-        if st.sidebar.button('Retrieve research papers'):
-            is_retrived = True      
+        if st.sidebar.button('Retrieve research papers'):     
             titles, paper_links = fetch_research_papers(last_user_query)
             st.subheader('Research Papers')
-            for title in titles:
-                st.write(title)
+            if not titles:
+                st.write('Could not find any research papers')
+            else:
+                is_retrived = True 
+                for title in titles:
+                    st.write(title)
 
-    if is_retrived:
-        if st.sidebar.button('Summarize Research Papers'):
-                full_texts = [fetch_full_text(link) for link in paper_links]
-                st.subheader('Summarized Texts')
-                for text in full_texts:
-                    st.write(summarize_document(text))
-        is_retrived = False
+    if st.sidebar.button('Summarize Research Papers'):
+        full_texts = [fetch_full_text(link) for link in paper_links]
+        st.subheader('Summarized Texts')
+        for text in full_texts:
+            st.write(summarize_document(text))
 
 
 if __name__ == "__main__":
