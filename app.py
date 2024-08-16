@@ -1,46 +1,40 @@
 import streamlit as st
-import openai
-import numpy as np
-import faiss
+from langchain_openai import OpenAI
+from langchain.chains.combine_documents import create_stuff_documents_chain
+from langchain.chains import create_history_aware_retriever
+from langchain_community.retrievers import PubMedRetriever
+from langchain.schema import Document
+from langchain.prompts import PromptTemplate
 import requests
 from bs4 import BeautifulSoup
 
 # Retrieve OpenAI API key from secrets.toml
-openai.api_key = st.secrets["openai"]["api_key"]
+api_key = st.secrets["openai"]["api_key"]
 
-# Function to get embeddings from OpenAI
-def get_embeddings(texts):
-    response = openai.Embedding.create(
-        input=texts,
-        model="text-embedding-ada-002"
-    )
-    embeddings = [item['embedding'] for item in response['data']]
-    return np.array(embeddings)
+# Initialize OpenAI model
+llm = OpenAI(api_key=api_key)
 
-# Function to generate a response from OpenAI (using chat model)
-def generate_response(messages):
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=messages
-    )
-    return response.choices[0].message['content'].strip()
+# Initialize PubMed retriever
+retriever = PubMedRetriever()
 
-# Initialize FAISS index
-def initialize_index(embeddings):
-    dimension = embeddings.shape[1]
-    index = faiss.IndexFlatL2(dimension)
-    index.add(embeddings)
-    return index
+# Create the prompt template for document combination
+document_prompt_template = PromptTemplate.from_template(
+    "Based on the following context, provide a detailed response to the question: {question}\n\nContext:\n{context}"
+)
 
-# Function to retrieve relevant context from indexed documents
-def retrieve_context(query, index, documents):
-    query_embedding = get_embeddings([query])
-    D, I = index.search(query_embedding, 1)
-    top_doc_index = I[0][0]
-    context = documents[top_doc_index]
-    return context
+# Create the history-aware retriever chain
+history_retriever_chain = create_history_aware_retriever(
+    prompt=PromptTemplate.from_template("You are a helpful assistant. Based on the following history, provide an answer to the query: {input}"),
+    llm=llm,
+    retriever=retriever
+)
 
-# Function to fetch research papers from PubMed
+# Create the document combination chain with the prompt template
+document_chain = create_stuff_documents_chain(
+    llm=llm,
+    prompt=document_prompt_template
+)
+
 def fetch_research_papers(query):
     url = f"https://pubmed.ncbi.nlm.nih.gov/?term={query.replace(' ', '+')}"
     response = requests.get(url)
@@ -50,66 +44,71 @@ def fetch_research_papers(query):
     paper_links = [paper['href'] for paper in papers]
     return titles, paper_links
 
-# Function to fetch full-text document from PubMed
 def fetch_full_text(url):
     response = requests.get(f"https://pubmed.ncbi.nlm.nih.gov{url}")
     soup = BeautifulSoup(response.text, 'html.parser')
     abstract = soup.find('div', class_='abstract-content selected')
     return abstract.get_text(strip=True) if abstract else 'No full text available.'
 
-# Function to summarize a document
 def summarize_document(document):
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "You are a helpful assistant."},
-            {"role": "user", "content": f"Please summarize the following document:\n{document}"}
-        ]
-    )
-    return response.choices[0].message['content'].strip()
+    prompt = f"Please summarize the following document:\n{document}"
+    result = llm(prompt)
+    return result.strip()
 
-# Streamlit interface
-st.set_page_config(
-    page_title="MedChain",
-     page_icon="🏥",
-)
-st.title('Health Q&A Application')
+def generate_response(question, context):
+    prompt = f"Based on the following context, provide a detailed response to the question: {question}\n\nContext:\n{context}"
+    result = llm(prompt)
+    return result.strip()
 
-user_query = st.text_input('Ask a question:')
-full_texts = []  # Initialize full_texts to be used later
-titles = []      # Initialize titles to be used later
-paper_links = [] # Initialize paper_links to be used later
+def main():
+    st.set_page_config(page_title="MedChain", page_icon="🏥")
+    st.title('MedChain')
 
-if user_query:
-    if st.checkbox('Retrieve research papers'):
-        titles, paper_links = fetch_research_papers(user_query)
-        st.subheader('Research Papers')
-        for title in titles:
-            st.write(title)
+    user_query = st.text_input('Ask a question:')
+    full_texts = []  # Initialize full_texts to be used later
+    titles = []      # Initialize titles to be used later
+    paper_links = [] # Initialize paper_links to be used later
 
-        if st.button('Summarize Research Papers'):
-            full_texts = [fetch_full_text(link) for link in paper_links]
-            st.subheader('Summarized Texts')
-            for text in full_texts:
-                st.write(text)
+    chat_history = []  # List to store conversation history
 
-    else:
-        if full_texts:
-            # Encode documents and initialize FAISS index with real documents
-            document_embeddings = get_embeddings(full_texts)
-            index = initialize_index(document_embeddings)
-            context = retrieve_context(user_query, index, full_texts)
-            messages = [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": f"Context: {context}\nQuestion: {user_query}"}
-            ]
-            answer = generate_response(messages)
-            st.write(answer)
+    if user_query:
+        if st.checkbox('Retrieve research papers'):
+            titles, paper_links = fetch_research_papers(user_query)
+            st.subheader('Research Papers')
+            for title in titles:
+                st.write(title)
+
+            if st.button('Summarize Research Papers'):
+                full_texts = [fetch_full_text(link) for link in paper_links]
+                st.subheader('Summarized Texts')
+                for text in full_texts:
+                    st.write(summarize_document(text))
+
         else:
-            # Handle scenario where there are no documents and no papers have been retrieved
-            messages = [
-                {"role": "system", "content": "You are a helpful assistant."},
-                {"role": "user", "content": f"Question: {user_query}"}
-            ]
-            answer = generate_response(messages)
-            st.write(answer)
+            if full_texts:
+                # Convert full texts to Document objects
+                documents = [Document(page_content=text) for text in full_texts]
+                # Generate context and answer using LangChain
+                context = history_retriever_chain.invoke({
+                    "input": user_query,
+                    "history": [doc.page_content for doc in documents]
+                })
+                # Use the document chain to get the final answer
+                answer = document_chain.invoke({
+                    "input_documents": documents,
+                    "question": user_query,
+                    "context": context
+                })
+                st.write(answer)
+            else:
+                # Handle scenario where there are no documents and no papers have been retrieved
+                answer = generate_response(user_query, "")
+                st.write(answer)
+
+    if chat_history:
+        st.subheader('Chat History')
+        for entry in chat_history:
+            st.write(f"{entry['role'].capitalize()}: {entry['content']}")
+
+if __name__ == "__main__":
+    main()
